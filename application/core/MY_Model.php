@@ -35,10 +35,10 @@ class MY_Model extends CI_Model {
 	/**
 	 * Support for soft deletes and this model's 'deleted' key
 	 */
-	protected $soft_delete = FALSE;
+	protected $soft_delete = false;
 	protected $soft_delete_key = 'deleted';
-	protected $_temporary_with_deleted = FALSE;
-	protected $_temporary_only_deleted = FALSE;
+	protected $_temporary_with_deleted = false;
+	protected $_temporary_only_deleted = false;
 
 	/**
 	 * The various callbacks available to the model. Each are
@@ -52,6 +52,8 @@ class MY_Model extends CI_Model {
 	protected $after_get = array();
 	protected $before_delete = array();
 	protected $after_delete = array();
+	protected $before_replace = array();
+	protected $after_replace = array();
 
 	protected $callback_parameters = array();
 
@@ -79,14 +81,20 @@ class MY_Model extends CI_Model {
 	 * Optionally skip the validation. Used in conjunction with
 	 * skip_validation() to skip data validation for any future calls.
 	 */
-	protected $skip_validation = FALSE;
+	protected $skip_validation = false;
+
+	/**
+	 * An array of validation rules message.
+	 * @var array
+	 */
+	protected $validate_messages = array();
 
 	/**
 	 * By default we return our results as objects. If we need to override
 	 * this, we can, or, we could use the `as_array()` and `as_object()` scopes.
 	 */
 	protected $return_type = 'object';
-	protected $_temporary_return_type = NULL;
+	protected $_temporary_return_type = null;
 
 	/* --------------------------------------------------------------
 	 * GENERIC METHODS
@@ -120,6 +128,7 @@ class MY_Model extends CI_Model {
 	 * @return [type]                [description]
 	 */
 	public function get($primary_value) {
+		$this->db->limit(1);
 		return $this->get_by($this->primary_key, $primary_value);
 	}
 
@@ -131,8 +140,8 @@ class MY_Model extends CI_Model {
 	public function get_by() {
 		$where = func_get_args();
 
-		if ($this->soft_delete && $this->_temporary_with_deleted !== TRUE) {
-			$this->_database->where($this->soft_delete_key, (bool)$this->_temporary_only_deleted);
+		if ($this->soft_delete && $this->_temporary_with_deleted !== true) {
+			$this->_database->where($this->_table . '.' . $this->soft_delete_key, (bool)$this->_temporary_only_deleted);
 		}
 
 		$this->_set_where($where);
@@ -180,8 +189,8 @@ class MY_Model extends CI_Model {
 	public function get_all() {
 		$this->trigger('before_get');
 
-		if ($this->soft_delete && $this->_temporary_with_deleted !== TRUE) {
-			$this->_database->where($this->soft_delete_key, (bool)$this->_temporary_only_deleted);
+		if ($this->soft_delete && $this->_temporary_with_deleted !== true) {
+			$this->_database->where($this->_table . '.' . $this->soft_delete_key, (bool)$this->_temporary_only_deleted);
 		}
 
 		$result = $this->_database->get($this->_table)
@@ -203,14 +212,23 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $skip_validation [description]
 	 * @return [type]                   [description]
 	 */
-	public function insert($data, $skip_validation = FALSE) {
-		if ($skip_validation === FALSE) {
+	public function insert($data, $skip_validation = false) {
+		$data = $this->trigger('before_create', $data);
+
+		if ($skip_validation === false) {
 			$data = $this->validate($data);
 		}
 
-		if ($data !== FALSE) {
-			$data = $this->trigger('before_create', $data);
+		/* Auto assign ZERO(0) to soft delete key if not specified by user
+		// https://github.com/hendyanto/codeigniter-base-model/commit/0ceb6b46cbe70612def8d9f27078ed4b2375b76f
+		if ($this->soft_delete) {
+			if (!isset($data[$this->soft_delete_key])) {
+				$data[$this->soft_delete_key] = 0;
+			}
+		}
+		*/
 
+		if ($data !== false) {
 			$this->_database->insert($this->_table, $data);
 			$insert_id = $this->_database->insert_id();
 
@@ -219,7 +237,7 @@ class MY_Model extends CI_Model {
 			return $insert_id;
 		}
 		else {
-			return FALSE;
+			return false;
 		}
 	}
 
@@ -229,7 +247,7 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $skip_validation [description]
 	 * @return [type]                   [description]
 	 */
-	public function insert_many($data, $skip_validation = FALSE) {
+	public function insert_many($data, $skip_validation = false) {
 		$ids = array();
 
 		foreach ($data as $key => $row) {
@@ -246,14 +264,14 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $skip_validation [description]
 	 * @return [type]                   [description]
 	 */
-	public function update($primary_value, $data, $skip_validation = FALSE) {
+	public function update($primary_value, $data, $skip_validation = false) {
 		$data = $this->trigger('before_update', $data);
 
-		if ($skip_validation === FALSE) {
+		if ($skip_validation === false) {
 			$data = $this->validate($data);
 		}
 
-		if ($data !== FALSE) {
+		if ($data !== false) {
 			$result = $this->_database->where($this->primary_key, $primary_value)
 							   ->set($data)
 							   ->update($this->_table);
@@ -263,7 +281,7 @@ class MY_Model extends CI_Model {
 			return $result;
 		}
 		else {
-			return FALSE;
+			return false;
 		}
 	}
 
@@ -274,14 +292,14 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $skip_validation [description]
 	 * @return [type]                   [description]
 	 */
-	public function update_many($primary_values, $data, $skip_validation = FALSE) {
+	public function update_many($primary_values, $data, $skip_validation = false) {
 		$data = $this->trigger('before_update', $data);
 
-		if ($skip_validation === FALSE) {
+		if ($skip_validation === false) {
 			$data = $this->validate($data);
 		}
 
-		if ($data !== FALSE) {
+		if ($data !== false) {
 			$result = $this->_database->where_in($this->primary_key, $primary_values)
 							   ->set($data)
 							   ->update($this->_table);
@@ -291,7 +309,7 @@ class MY_Model extends CI_Model {
 			return $result;
 		}
 		else {
-			return FALSE;
+			return false;
 		}
 	}
 
@@ -305,7 +323,7 @@ class MY_Model extends CI_Model {
 
 		$data = $this->trigger('before_update', $data);
 
-		if ($this->validate($data) !== FALSE) {
+		if ($this->validate($data) !== false) {
 			$this->_set_where($args);
 			$result = $this->_database->set($data)
 							   ->update($this->_table);
@@ -314,7 +332,7 @@ class MY_Model extends CI_Model {
 			return $result;
 		}
 		else {
-			return FALSE;
+			return false;
 		}
 	}
 
@@ -343,7 +361,7 @@ class MY_Model extends CI_Model {
 		$this->_database->where($this->primary_key, $id);
 
 		if ($this->soft_delete) {
-			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => TRUE ));
+			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => true ));
 		}
 		else {
 			$result = $this->_database->delete($this->_table);
@@ -367,7 +385,7 @@ class MY_Model extends CI_Model {
 
 
 		if ($this->soft_delete) {
-			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => TRUE ));
+			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => true ));
 		}
 		else {
 			$result = $this->_database->delete($this->_table);
@@ -389,7 +407,7 @@ class MY_Model extends CI_Model {
 		$this->_database->where_in($this->primary_key, $primary_values);
 
 		if ($this->soft_delete) {
-			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => TRUE ));
+			$result = $this->_database->update($this->_table, array( $this->soft_delete_key => true ));
 		}
 		else {
 			$result = $this->_database->delete($this->_table);
@@ -400,6 +418,30 @@ class MY_Model extends CI_Model {
 		return $result;
 	}
 
+	/**
+	 * Replace data
+	 * @param  [type]  $data            [description]
+	 * @param  boolean $skip_validation [description]
+	 * @return [type]                   [description]
+	 */
+	public function replace($data, $skip_validation = false) {
+		if ($skip_validation === false) {
+			$data = $this->validate($data);
+		}
+
+		if ($data !== false) {
+			$data = $this->trigger('before_replace', $data);
+
+			$result = $this->_database->replace($this->_table, $data);
+
+			$this->trigger('after_replace', array($data, $result));
+
+			return $result;
+		}
+		else {
+			return false;
+		}
+	}
 
 	/**
 	 * Truncates the table
@@ -448,6 +490,9 @@ class MY_Model extends CI_Model {
 			else {
 				$relationship = $key;
 				$options = $value;
+				if (!isset($options['model'])) {
+					$options['model'] = $value . '_model';
+				}
 			}
 
 			if (in_array($relationship, $this->_with)) {
@@ -470,6 +515,9 @@ class MY_Model extends CI_Model {
 			else {
 				$relationship = $key;
 				$options = $value;
+				if (!isset($options['model'])) {
+					$options['model'] = $value . '_model';
+				}
 			}
 
 			if (in_array($relationship, $this->_with)) {
@@ -508,8 +556,8 @@ class MY_Model extends CI_Model {
 
 		$this->trigger('before_dropdown', array( $key, $value ));
 
-		if ($this->soft_delete && $this->_temporary_with_deleted !== TRUE) {
-			$this->_database->where($this->soft_delete_key, FALSE);
+		if ($this->soft_delete && $this->_temporary_with_deleted !== true) {
+			$this->_database->where($this->_table . '.' . $this->soft_delete_key, false);
 		}
 
 		$result = $this->_database->select(array($key, $value))
@@ -532,8 +580,8 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	public function count_by() {
-		if ($this->soft_delete && $this->_temporary_with_deleted !== TRUE) {
-			$this->_database->where($this->soft_delete_key, (bool)$this->_temporary_only_deleted);
+		if ($this->soft_delete && $this->_temporary_with_deleted !== true) {
+			$this->_database->where($this->_table . '.' . $this->soft_delete_key, (bool)$this->_temporary_only_deleted);
 		}
 
 		$where = func_get_args();
@@ -547,8 +595,8 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	public function count_all() {
-		if ($this->soft_delete && $this->_temporary_with_deleted !== TRUE) {
-			$this->_database->where($this->soft_delete_key, (bool)$this->_temporary_only_deleted);
+		if ($this->soft_delete && $this->_temporary_with_deleted !== true) {
+			$this->_database->where($this->_table . '.' . $this->soft_delete_key, (bool)$this->_temporary_only_deleted);
 		}
 
 		return $this->_database->count_all($this->_table);
@@ -559,7 +607,7 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	public function skip_validation() {
-		$this->skip_validation = TRUE;
+		$this->skip_validation = true;
 		return $this;
 	}
 
@@ -590,6 +638,14 @@ class MY_Model extends CI_Model {
 		return $this->_table;
 	}
 
+	/**
+	 * Getter for the primary_key
+	 * @return [type] [description]
+	 */
+	public function primary_key() {
+		return $this->primary_key;
+	}
+
 	/* --------------------------------------------------------------
 	 * GLOBAL SCOPES
 	 * ------------------------------------------------------------ */
@@ -617,7 +673,7 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	public function with_deleted() {
-		$this->_temporary_with_deleted = TRUE;
+		$this->_temporary_with_deleted = true;
 		return $this;
 	}
 
@@ -626,7 +682,7 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	public function only_deleted() {
-		$this->_temporary_only_deleted = TRUE;
+		$this->_temporary_only_deleted = true;
 		return $this;
 	}
 
@@ -674,7 +730,9 @@ class MY_Model extends CI_Model {
 	 */
 	public function serialize($row) {
 		foreach ($this->callback_parameters as $column) {
-			$row[$column] = serialize($row[$column]);
+			if (isset($row[$column])) {
+				$row[$column] = serialize($row[$column]);
+			}
 		}
 
 		return $row;
@@ -686,12 +744,14 @@ class MY_Model extends CI_Model {
 	 * @return [type]      [description]
 	 */
 	public function unserialize($row) {
-		foreach ($this->callback_parameters as $column) {
-			if (is_array($row)) {
-				$row[$column] = unserialize($row[$column]);
-			}
-			else {
-				$row->$column = unserialize($row->$column);
+		if (!empty($row)) {
+			foreach ($this->callback_parameters as $column) {
+				if (is_array($row)) {
+					$row[$column] = unserialize($row[$column]);
+				}
+				else {
+					$row->$column = unserialize($row->$column);
+				}
 			}
 		}
 
@@ -762,7 +822,7 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $last  [description]
 	 * @return [type]         [description]
 	 */
-	public function trigger($event, $data = FALSE, $last = TRUE) {
+	public function trigger($event, $data = false, $last = true) {
 		if (isset($this->$event) && is_array($this->$event)) {
 			foreach ($this->$event as $method) {
 				if (strpos($method, '(')) {
@@ -790,28 +850,38 @@ class MY_Model extends CI_Model {
 		}
 
 		if(!empty($this->validate)) {
-			foreach($data as $key => $val) {
-				$_POST[$key] = $val;
-			}
+			isset($this->form_validation) or $this->load->library('form_validation');
 
-			$this->load->library('form_validation');
+			if (method_exists($this->form_validation, 'set_data')) {
+				$this->form_validation->reset_validation();
+				$this->form_validation->set_data($data);
+			}
+			else {
+				foreach($data as $key => $val) {
+					$_POST[$key] = $val;
+				}
+			}
 
 			if(is_array($this->validate)) {
 				$this->form_validation->set_rules($this->validate);
 
-				if ($this->form_validation->run() === TRUE) {
+				foreach ($this->validate_messages as $validate_message) {
+					$this->form_validation->set_message($validate_message['rule'], $validate_message['message']);
+				}
+
+				if ($this->form_validation->run() === true) {
 					return $data;
 				}
 				else {
-					return FALSE;
+					return false;
 				}
 			}
 			else {
-				if ($this->form_validation->run($this->validate) === TRUE) {
+				if ($this->form_validation->run($this->validate) === true) {
 					return $data;
 				}
 				else {
-					return FALSE;
+					return false;
 				}
 			}
 		}
@@ -825,7 +895,7 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	private function _fetch_table() {
-		if ($this->_table == NULL) {
+		if ($this->_table == null) {
 			$this->_table = plural(preg_replace('/(_m|_model)?$/', '', strtolower(get_class($this))));
 		}
 	}
@@ -835,7 +905,7 @@ class MY_Model extends CI_Model {
 	 * @return [type] [description]
 	 */
 	private function _fetch_primary_key() {
-		if($this->primary_key == NULl) {
+		if($this->primary_key == null) {
 			$this->primary_key = $this->_database->query("SHOW KEYS FROM `".$this->_table."` WHERE Key_name = 'PRIMARY'")->row()->Column_name;
 		}
 	}
@@ -889,7 +959,7 @@ class MY_Model extends CI_Model {
 	 * @param  boolean $multi [description]
 	 * @return [type]         [description]
 	 */
-	protected function _return_type($multi = FALSE) {
+	protected function _return_type($multi = false) {
 		$method = ($multi) ? 'result' : 'row';
 		return $this->_temporary_return_type == 'array' ? $method . '_array' : $method;
 	}
