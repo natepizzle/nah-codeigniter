@@ -12,6 +12,12 @@ application/sessions/*
 !application/sessions/index.html
 !application/sessions/.htaccess
 
+# Sensitive Files
+application/config/development/*
+application/config/production/*
+!application/config/development/index.html
+!application/config/production/index.html
+
 user_guide_src/build/*
 user_guide_src/cilexer/build/*
 user_guide_src/cilexer/dist/*
