@@ -1,4 +1,4 @@
-<?php
+<?php defined('BASEPATH') OR exit('No direct script access allowed');
 /**
  * Clean up your view code and remove nasty, brittle logic using
  * the presenters - from The CodeIgniter Handbook - Volume One - Who Needs Ruby?
@@ -7,33 +7,34 @@
  * @copyright Copyright (c) 2012, Jamie Rumbelow <http://jamierumbelow.net>
  */
 
-class Presenter
-{
+class Presenter {
 	/**
 	 * Stores the object's name
+	 * @var string
 	 */
 	protected $_objectName = '';
 
 	/**
 	 * Takes an object and prepares to present it
+	 * @param [type] $object [description]
+	 * @param string $name   [description]
 	 */
-	public function __construct($object, $name = '')
-	{
+	public function __construct($object, $name = '') {
 		$this->_objectName = $name ?: strtolower(str_ireplace('_presenter', '', get_class($this)));
 		$this->{$this->_objectName} = $object;
 	}
 
 	/**
 	 * Dynamically fetch properties from the object
+	 * @param  [type] $name [description]
+	 * @param  array  $args [description]
+	 * @return [type]       [description]
 	 */
-	public function __call($name, $args = array())
-	{
-		if (isset($this->{$this->_objectName}->$name))
-		{
+	public function __call($name, $args = array()) {
+		if (isset($this->{$this->_objectName}->$name)) {
 			return $this->{$this->_objectName}->$name;
 		}
-		else
-		{
+		else {
 			throw new BadMethodCallException("Call to undefined method " . get_class($this) . "::" . $name . '()');
 		}
 	}
